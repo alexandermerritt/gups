@@ -5,23 +5,25 @@ SHELL = /bin/sh
 # System-specific settings
 
 CC =		gcc
-CCFLAGS =	-O -g -DCHECK
+CCFLAGS =	-O3 -g -DCHECK -DLIKWID_PERFMON
 LINK =		gcc
-LINKFLAGS =	-O -g 
-LIB =		-lmpich
+LIB =		-lmpich -llikwid -lm
 
 # Link target
 
 gups_vanilla:	gups_vanilla.o
-	$(LINK) $(LINKFLAGS) gups_vanilla.o $(LIB) -o gups_vanilla
+	$(LINK) gups_vanilla.o -o gups_vanilla $(LIB)
 
 gups_nonpow2:	gups_nonpow2.o
-	$(LINK) $(LINKFLAGS) gups_nonpow2.o $(LIB) -o gups_nonpow2
+	$(LINK) gups_nonpow2.o $(LIB) -o gups_nonpow2
 
 gups_opt:	gups_opt.o
-	$(LINK) $(LINKFLAGS) gups_opt.o $(LIB) -o gups_opt
+	$(LINK) gups_opt.o $(LIB) -o gups_opt
 
 # Compilation rules
 
 %.o:%.c
 	$(CC) $(CCFLAGS) -c $<
+
+clean:
+	rm -f *.o gups_vanilla

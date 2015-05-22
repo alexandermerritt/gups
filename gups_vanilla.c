@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpich/mpi.h>
+#include <sys/mman.h>
 
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 
@@ -98,9 +99,23 @@ int main(int narg, char **arg)
 
   chunkbig = 16*chunk;
 
+#if 0
   table = (u64Int *) malloc(nlocal*sizeof(u64Int));
   data = (u64Int *) malloc(chunkbig*sizeof(u64Int));
   send = (u64Int *) malloc(chunkbig*sizeof(u64Int));
+#else
+  unsigned int flags = MAP_ANON | MAP_PRIVATE | MAP_LOCKED;
+  // flags |= MAP_POPULATE;
+  table = (u64Int *) mmap(NULL, nlocal*sizeof(u64Int),
+          PROT_READ|PROT_WRITE, flags, -1, 0);
+  if (MAP_FAILED == table) { perror("mmap"); return 1; }
+  data = (u64Int *) mmap(NULL, chunkbig*sizeof(u64Int),
+          PROT_READ|PROT_WRITE, flags, -1, 0);
+  if (MAP_FAILED == data) { perror("mmap"); return 1; }
+  send = (u64Int *) mmap(NULL, chunkbig*sizeof(u64Int),
+          PROT_READ|PROT_WRITE, flags, -1, 0);
+  if (MAP_FAILED == send) { perror("mmap"); return 1; }
+#endif
 
   if (!table || !data || !send) {
     if (me == 0) printf("Table allocation failed\n");
