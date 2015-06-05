@@ -5,14 +5,21 @@ SHELL = /bin/sh
 # System-specific settings
 
 CC =		gcc
-CCFLAGS =	-O3 -g -DCHECK -DLIKWID_PERFMON
+CCFLAGS =	-O3 -I/usr/include/openmpi-x86_64 -std=gnu99 -Wall -Wextra -Werror -Wno-unused-variable
 LINK =		gcc
-LIB =		-lmpich -llikwid -lm
+LIB =		-L/usr/lib64/openmpi/lib -lmpi
 
 # Link target
 
-gups_vanilla:	gups_vanilla.o
-	$(LINK) gups_vanilla.o -o gups_vanilla $(LIB)
+all:	gups gups.lw
+
+gups:	gups_vanilla.c
+	$(CC) $^ -o gups.o -c $(CCFLAGS)
+	$(CC) gups.o -o $@ $(LIB)
+
+gups.lw:	gups_vanilla.c
+	$(CC) $^ -c -o gups.o -DLIKWID_PERFMON $(CCFLAGS)
+	$(CC) gups.o -o $@ $(LIB) -llikwid -lm
 
 gups_nonpow2:	gups_nonpow2.o
 	$(LINK) gups_nonpow2.o $(LIB) -o gups_nonpow2
@@ -26,4 +33,4 @@ gups_opt:	gups_opt.o
 	$(CC) $(CCFLAGS) -c $<
 
 clean:
-	rm -f *.o gups_vanilla
+	rm -f *.o gups_vanilla gups gups.lw
