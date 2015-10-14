@@ -15,6 +15,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "mpi.h"
+#include <likwid.h>
 
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 
@@ -51,7 +52,7 @@ typedef unsigned long long u64Int;
 
 void sort_data (u64Int *source, u64Int *nomatch, u64Int *match, int number, 
 		int *nnomatch, int *nmatch, int mask_shift);
-inline void update_table (u64Int *data, u64Int *table, int number, int nlocalm1);
+void update_table (u64Int *data, u64Int *table, int number, long nlocalm1);
 u64Int HPCC_starts(s64Int n);
 
 int main(int narg, char **arg)
@@ -74,6 +75,9 @@ int nsend,nkeep,nrecv;
   MPI_Status status;
   MPI_Request request[PITER][MAXLOGPROCS];
   MPI_Request srequest;
+
+  LIKWID_MARKER_INIT;
+  LIKWID_MARKER_THREADINIT;
 
   MPI_Init(&narg,&arg);
   MPI_Comm_rank(MPI_COMM_WORLD,&me);
@@ -119,7 +123,9 @@ int nsend,nkeep,nrecv;
 
   /* allocate local memory */
 
+  printf("%6ld GB table\n", (nlocal*8)>>30);
   table = (u64Int *) calloc(1,nlocal*sizeof(u64Int));
+  printf("%6d MB data\n", (CHUNKBIG*8)>>20);
   data = (u64Int *) calloc(1,CHUNKBIG*sizeof(u64Int));
 
   if (!table || !data) {
@@ -171,6 +177,7 @@ int nsend,nkeep,nrecv;
   nexcess = 0;
   nbad = 0;
 
+  LIKWID_MARKER_START("region_exec");
   MPI_Barrier(MPI_COMM_WORLD);
   t0 = -MPI_Wtime();
 
@@ -256,6 +263,7 @@ int nsend,nkeep,nrecv;
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
+  LIKWID_MARKER_STOP("region_exec");
   t0 += MPI_Wtime();
 
   /* stats */
@@ -299,6 +307,7 @@ int nsend,nkeep,nrecv;
   free(send1);
   free(send2);
 #endif
+  LIKWID_MARKER_CLOSE;
   MPI_Finalize();
 }
 
@@ -352,7 +361,7 @@ void sort_data(u64Int *source, u64Int *nomatch, u64Int *match, int number,
   *nmatch = counts[1];
 }
 
-inline void update_table(u64Int *data, u64Int *table, int number, int nlocalm1)
+inline void update_table(u64Int *data, u64Int *table, int number, long nlocalm1)
 {
 /* DEEP_UNROLL doesn't seem to improve anything at this time */
 /* Manual unrolling is a significant win if -Msafeptr is used -KDU */
