@@ -51,17 +51,18 @@ typedef unsigned long long u64Int;
 
 void sort_data (u64Int *source, u64Int *nomatch, u64Int *match, int number, 
 		int *nnomatch, int *nmatch, int mask_shift);
-inline update_table (u64Int *data, u64Int *table, int number, int nlocalm1);
+inline void update_table (u64Int *data, u64Int *table, int number, int nlocalm1);
 u64Int HPCC_starts(s64Int n);
 
 int main(int narg, char **arg)
 {
   int me,nprocs;
-  int i,j,k,iterate,niterate;
-  int nlocal,nlocalm1,logtable,index,logtablelocal;
-  int logprocs,ipartner,ndata,nsend,nkeep,nkept,nrecv;
-  int maxndata,maxnfinal,nexcess;
-  int nbad;
+  long i,j,k,iterate,niterate;
+  long nlocal,nlocalm1,logtable,index,logtablelocal;
+  long logprocs,ipartner,ndata,nkept;
+int nsend,nkeep,nrecv;
+  long maxndata,maxnfinal,nexcess;
+  long nbad;
   double t0,t0_all,Gups;
   u64Int *table,*data,*send, *keep_data;
 #ifndef USE_BLOCKING_SEND
@@ -77,6 +78,8 @@ int main(int narg, char **arg)
   MPI_Init(&narg,&arg);
   MPI_Comm_rank(MPI_COMM_WORLD,&me);
   MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
+
+  (void)procmask; // shh compiler
 
   /* command line args = N M
      N = length of global table is 2^N
@@ -116,8 +119,8 @@ int main(int narg, char **arg)
 
   /* allocate local memory */
 
-  table = (u64Int *) malloc(nlocal*sizeof(u64Int));
-  data = (u64Int *) malloc(CHUNKBIG*sizeof(u64Int));
+  table = (u64Int *) calloc(1,nlocal*sizeof(u64Int));
+  data = (u64Int *) calloc(1,CHUNKBIG*sizeof(u64Int));
 
   if (!table || !data) {
     if (me == 0) printf("Table allocation failed\n");
@@ -125,14 +128,14 @@ int main(int narg, char **arg)
   }
 
 #ifdef USE_BLOCKING_SEND
-  send = (u64Int *) malloc(CHUNKBIG*sizeof(u64Int));
+  send = (u64Int *) calloc(1,CHUNKBIG*sizeof(u64Int));
   if (!send) {
     if (me == 0) printf("Table allocation failed\n");
     MPI_Abort(MPI_COMM_WORLD,1);
   }
 #else
-  send1 = (u64Int *) malloc(CHUNKBIG*sizeof(u64Int));
-  send2 = (u64Int *) malloc(CHUNKBIG*sizeof(u64Int));
+  send1 = (u64Int *) calloc(1,CHUNKBIG*sizeof(u64Int));
+  send2 = (u64Int *) calloc(1,CHUNKBIG*sizeof(u64Int));
   send = send1;
   if (!send1 || !send2) {
     if (me == 0) printf("Table allocation failed\n");
@@ -142,7 +145,7 @@ int main(int narg, char **arg)
 
   for (j = 0; j < PITER; j++)
     for (i=0; i<logprocs; i++) {
-      if ((recv[j][i] = (u64Int *)malloc(sizeof(u64Int)*RCHUNK)) == NULL) {
+      if ((recv[j][i] = (u64Int *)calloc(1,sizeof(u64Int)*RCHUNK)) == NULL) {
          printf("Recv buffer allocation failed\n");
          MPI_Abort(MPI_COMM_WORLD,1);
       }
@@ -275,8 +278,8 @@ int main(int narg, char **arg)
   if (me == 0) {
     printf("Number of procs: %d\n",nprocs);
     printf("Vector size: %lld\n",nglobal);
-    printf("Max datums during comm: %d\n",maxndata);
-    printf("Max datums after comm: %d\n",maxnfinal);
+    printf("Max datums during comm: %ld\n",maxndata);
+    printf("Max datums after comm: %ld\n",maxnfinal);
     printf("Excess datums (frac): %lld (%g)\n",
 	   nexcess_long,(double) nexcess_long / nupdates);
     printf("Bad locality count: %lld\n",nbad_long);
@@ -349,7 +352,7 @@ void sort_data(u64Int *source, u64Int *nomatch, u64Int *match, int number,
   *nmatch = counts[1];
 }
 
-inline update_table(u64Int *data, u64Int *table, int number, int nlocalm1)
+inline void update_table(u64Int *data, u64Int *table, int number, int nlocalm1)
 {
 /* DEEP_UNROLL doesn't seem to improve anything at this time */
 /* Manual unrolling is a significant win if -Msafeptr is used -KDU */
