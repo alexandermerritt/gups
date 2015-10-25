@@ -16,6 +16,7 @@
 #include "stdlib.h"
 #include "mpi.h"
 #include <likwid.h>
+#include <sys/mman.h>
 
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 
@@ -123,8 +124,31 @@ int nsend,nkeep,nrecv;
 
   /* allocate local memory */
 
+#define MAP_HUGE_2MB    (21 << MAP_HUGE_SHIFT)
+#define MAP_HUGE_1GB    (30 << MAP_HUGE_SHIFT)
+
   printf("%6ld GB table\n", (nlocal*8)>>30);
-  table = (u64Int *) calloc(1,nlocal*sizeof(u64Int));
+  //table = (u64Int *) calloc(1,nlocal*sizeof(u64Int));
+  const size_t len = nlocal*sizeof(u64Int);
+  //const int flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB | MAP_HUGE_1GB;
+  //const int flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB | MAP_HUGE_2MB;
+  const int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+  const int prot = PROT_READ | PROT_WRITE;
+  table = mmap(NULL, len, prot, flags, -1, 0);
+  if (table == MAP_FAILED) {
+    perror("mmap");
+    MPI_Abort(MPI_COMM_WORLD,1);
+  }
+  if (madvise(table, len, MADV_RANDOM))
+      MPI_Abort(MPI_COMM_WORLD,1);
+#if 0
+  if (getenv("HUGETLB")) {
+      printf("madv huge pages\n");
+      if (madvise(table, len, MADV_HUGEPAGE))
+          MPI_Abort(MPI_COMM_WORLD,1);
+  }
+#endif
+
   printf("%6d MB data\n", (CHUNKBIG*8)>>20);
   data = (u64Int *) calloc(1,CHUNKBIG*sizeof(u64Int));
 
@@ -299,7 +323,7 @@ int nsend,nkeep,nrecv;
 
   for (j = 0; j < PITER; j++)
     for (i = 0; i < logprocs; i++) free(recv[j][i]);
-  free(table);
+  //free(table);
   free(data);
 #ifdef USE_BLOCKING_SEND
   free(send);
